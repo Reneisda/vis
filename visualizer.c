@@ -74,7 +74,7 @@ void print_help(void) {
 	printf("Using default pulseaudio device\n");
 	printf("Switch shaders:\t\t\t 0-9\n");
 	printf("ToggleFPS: \t\t\t f\n");
-	printf("Toggle Filter low changes: \t e\n");
+	printf("Toggle Filter low changes: \t c\n");
 	return;
 }
 
