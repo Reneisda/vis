@@ -9,8 +9,7 @@
 
 
 #define MAX_BARS 1024
-#define COOL_DOWN 1
-#define COOL_DOWN_THRESHHOLD 0.04
+#define cool_down_THRESHHOLD 0.04
 
 typedef struct visu {
 	int count;
@@ -27,6 +26,7 @@ const uint32_t target_fps = 144;
 
 static visu_t visualizer;
 static float last_h[MAX_BARS];
+static int cool_down = 1;
 
 
 void visu_init(visu_t* vis, int bar_width, int gap) {
@@ -44,9 +44,9 @@ void visu_init(visu_t* vis, int bar_width, int gap) {
 
 void visu_render(visu_t* vis) {
 	for (int i = 0; i < vis->count; ++i) {
-		if (COOL_DOWN) {	// ignore smaller changes
+		if (cool_down) {	// ignore smaller changes
 			if (!(render_step++ % (target_fps * 100) == 0)) {
-				if (fabs(vis->height[i] - last_h[i]) < COOL_DOWN_THRESHHOLD) {
+				if (fabs(vis->height[i] - last_h[i]) < cool_down_THRESHHOLD) {
 					vis->height[i] = last_h[i];
 					last_h[i] = vis->height[i];
 				}
@@ -72,8 +72,9 @@ void visu_render(visu_t* vis) {
 void print_help(void) {
 	printf("Help\n");
 	printf("Using default pulseaudio device\n");
-	printf("Switch shaders:\t 0-9\n");
-	printf("ToggleFPS: \t f\n");
+	printf("Switch shaders:\t\t\t 0-9\n");
+	printf("ToggleFPS: \t\t\t f\n");
+	printf("Toggle Filter low changes: \t e\n");
 	return;
 }
 
@@ -177,6 +178,10 @@ int main(int argc, char** argv) {
 		// keyboard controls
         if (IsKeyReleased(KEY_F)) {
 			fps_on = fps_on ^ 1;
+		}
+		// filtering of just small changes
+		if (IsKeyReleased(KEY_C)) {
+			cool_down = cool_down ^ 1;
 		}
 
         BeginDrawing();
