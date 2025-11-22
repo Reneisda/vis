@@ -26,7 +26,7 @@ const uint32_t target_fps = 144;
 
 static visu_t visualizer;
 static float last_h[MAX_BARS];
-static int cool_down = 1;
+static int cool_down = 0;
 
 
 void visu_init(visu_t* vis, int bar_width, int gap) {
