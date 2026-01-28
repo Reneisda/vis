@@ -9,7 +9,7 @@
 
 
 #define MAX_BARS 1024
-#define cool_down_THRESHHOLD 0.04
+#define COOL_DOWN_THRESHHOLD 0.04
 
 typedef struct visu {
 	int count;
@@ -19,15 +19,36 @@ typedef struct visu {
 	volatile float height[MAX_BARS];
 } visu_t;
 
-const int screenWidth = 1600;
-const int screenHeight = 900;
+
+void shader_init_values(Shader* shaders, RenderTexture2D target, int index);
+
+int screenWidth = 1600;
+int screenHeight = 900;
+
 static uint32_t render_step = 1;
-const uint32_t target_fps = 144;
+uint32_t target_fps = 144;
 
 static visu_t visualizer;
 static float last_h[MAX_BARS];
 static int cool_down = 0;
 
+void visu_update(visu_t* vis, int bar_width, int gap) {
+	int count = screenWidth / (bar_width + gap) - 1;
+	/* TODO some ideas
+	if (count >= MAX_BARS) {
+		count = MAX_BARS;
+		// resize bar_width and gaps if to big
+		int space = screenWidth / MAX_BARS;
+		// ratio of 1 - 4 for bars and gaps
+		*gap = space / 4;
+		*bar_width = space - *gap;
+	}
+	*/
+
+	int padding = screenWidth - (count * (bar_width + gap) - gap);
+	vis->width = bar_width;
+	vis->count = count;
+}
 
 void visu_init(visu_t* vis, int bar_width, int gap) {
 	// calculate how many bars would fit
@@ -35,18 +56,19 @@ void visu_init(visu_t* vis, int bar_width, int gap) {
 	int padding = screenWidth - (count * (bar_width + gap) - gap);
 	vis->width = bar_width;
 	vis->count = count;
+
 	for (int i = 0; i < count; ++i) {
 		vis->x[i] = (padding / 2) + i * (bar_width + gap);
 		vis->height[i] = 0.0f;
 		vis->y[i] = screenHeight * 0.0f;
 	}
 }
-
+/*
 void visu_render(visu_t* vis) {
 	for (int i = 0; i < vis->count; ++i) {
 		if (cool_down) {	// ignore smaller changes
 			if (!(render_step++ % (target_fps * 100) == 0)) {
-				if (fabs(vis->height[i] - last_h[i]) < cool_down_THRESHHOLD) {
+				if (fabs(vis->height[i] - last_h[i]) < COOL_DOWN_THRESHHOLD) {
 					vis->height[i] = last_h[i];
 					last_h[i] = vis->height[i];
 				}
@@ -54,19 +76,35 @@ void visu_render(visu_t* vis) {
 				last_h[i] = 2.f;
 				printf("reset\n");
 			}
-
 		}
 
-		int bottom = screenHeight - vis->height[i];
-		int height = (int) screenHeight - ((float) screenHeight * vis->height[i]);
-
-		if (bottom - height < 2) 
-			height = screenHeight - 2;
+		//int bottom = screenHeight - vis->height[i];
+		int barHeight = screenHeight * (float) vis->height[i];
+		if (barHeight <= 0) barHeight = 2;
+		int topY      = screenHeight - barHeight;
 
 		float fade = (float) i / vis->count;
 		Color c = ColorFromHSV(fade * 80 + 260, 1 - fade, 1 - fade);
-		DrawRectangle(vis->x[i], height, vis->width, bottom + 1, c);
+		DrawRectangle(vis->x[i], topY, vis->width, barHeight, c);
 	}
+}
+*/
+
+
+void visu_render(visu_t* vis) {
+    for (int i = 0; i < vis->count; ++i) {
+	float h = vis->height[i];
+        if (h < 0.f) h = 0.f;
+        if (h > 1.f) h = 1.f;
+        int barHeight = (int)((float)screenHeight * h);
+        if (barHeight < 2) barHeight = 2;
+        int y = screenHeight - barHeight;
+        float fade = (float) i / vis->count;
+        Color c = ColorFromHSV(fade * 80 + 260, 1 - fade, 1 - fade);
+        c = ColorAlpha(c, 1.4f - fade);
+
+        DrawRectangle(vis->x[i], y, vis->width, barHeight, c);
+    }
 }
 
 void print_help(void) {
@@ -78,7 +116,6 @@ void print_help(void) {
 	return;
 }
 
-void shader_init_values(Shader* shaders, RenderTexture2D target, int index);
 
 void load_shaders(Shader* shaders, RenderTexture2D target) {
 	// 0 index -> shader disabled
@@ -141,16 +178,25 @@ void shader_init_values(Shader* shaders, RenderTexture2D target, int index) {
 
 int main(int argc, char** argv) {
 	int fps_on = 0;
-	int shader_num = 1;
+	int shader_num = 1;		// default shader
 
+	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+	SetConfigFlags(FLAG_VSYNC_HINT);
+	SetConfigFlags(FLAG_WINDOW_TRANSPARENT);
     if ((argc > 1) && (strcmp("-h", argv[1]) == 0 || strcmp("--help", argv[1]) == 0)) {
         print_help();
         return 0;
     }
 
     // Initer
+	int refresh_rate = GetMonitorRefreshRate(GetCurrentMonitor());
+	target_fps = refresh_rate;
     InitWindow(screenWidth, screenHeight, "Visualizer");
     SetTargetFPS(target_fps);
+	SetWindowMinSize(0, 0);
+	SetWindowTitle("vis");
+	SetWindowOpacity(0.4f);
+
 	// Loading shaders
 	Shader shaders[10] = {0};
 	// starting with default shader 1
@@ -171,21 +217,21 @@ int main(int argc, char** argv) {
 		}
 
         BeginTextureMode(target);
-        ClearBackground(BLACK);
+        ClearBackground(BLANK);
         visu_render(&visualizer);
         EndTextureMode();
 
 		// keyboard controls
         if (IsKeyReleased(KEY_F)) {
-			fps_on = fps_on ^ 1;
+			fps_on ^= 1;
 		}
 		// filtering of just small changes
 		if (IsKeyReleased(KEY_C)) {
-			cool_down = cool_down ^ 1;
+			cool_down ^= 1;
 		}
 
         BeginDrawing();
-        ClearBackground(BLACK);
+        ClearBackground(BLANK);
 
 		if (shader_num) BeginShaderMode(shaders[shader_num]);
 		Rectangle source = { 0, 0, (float) target.texture.width, (float) - target.texture.height };
@@ -206,6 +252,16 @@ int main(int argc, char** argv) {
 		}	
 
 		EndDrawing();
+
+		if (IsWindowResized()) {
+			printf("resizing\n");
+			screenWidth = GetScreenWidth();
+			screenHeight = GetScreenHeight();
+			visu_update(&visualizer, bar_w, gap_w);
+			UnloadRenderTexture(target);
+			target = LoadRenderTexture(screenWidth, screenHeight);
+    		SetTextureWrap(target.texture, TEXTURE_WRAP_CLAMP);
+		}
 	}
 
 	UnloadRenderTexture(target);
